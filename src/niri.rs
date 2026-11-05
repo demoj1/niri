@@ -4686,7 +4686,10 @@ impl Niri {
         //
         // However, this should probably be restricted to sending frame callbacks to more surfaces,
         // to err on the safe side.
-        self.send_frame_callbacks(output);
+        // Monitors off: no vblank throttles redraws, so callbacks make clients pile up buffers.
+        if self.monitors_active {
+            self.send_frame_callbacks(output);
+        }
         backend.with_primary_renderer(|renderer| {
             #[cfg(feature = "xdp-gnome-screencast")]
             {
@@ -5103,6 +5106,10 @@ impl Niri {
     }
 
     pub fn send_frame_callbacks_on_fallback_timer(&mut self) {
+        if !self.monitors_active || self.output_state.is_empty() {
+            return;
+        }
+
         let _span = tracy_client::span!("Niri::send_frame_callbacks_on_fallback_timer");
 
         // Make up a bogus output; we don't care about it here anyway, just the throttling timer.
