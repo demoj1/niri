@@ -5056,7 +5056,10 @@ impl Niri {
         //
         // However, this should probably be restricted to sending frame callbacks to more surfaces,
         // to err on the safe side.
-        self.send_frame_callbacks(output);
+        // Monitors off: no vblank throttles redraws, so callbacks make clients pile up buffers.
+        if self.monitors_active {
+            self.send_frame_callbacks(output);
+        }
         backend.with_primary_renderer(|renderer| {
             #[cfg(feature = "xdp-gnome-screencast")]
             {
