@@ -1,3 +1,19 @@
+> [!IMPORTANT]
+> **This is a personal fork of [niri-wm/niri](https://github.com/niri-wm/niri).**
+> `main` is upstream `main` with the fork commits kept on top and regularly rebased.
+> New features here are opt-in: without the new config options niri behaves exactly like upstream.
+> Arch package (v26.04 + the same patches): branch [`arch`](https://github.com/demoj1/niri/tree/arch) (`makepkg -si`).
+
+## Fork changelog
+
+| Date | Kind | Change | Default behavior |
+|---|---|---|---|
+| 2026-11-06 | fix | Don't send frame callbacks while monitors are powered off — fixes the VRAM leak that kills X11 windows ([#3295](https://github.com/niri-wm/niri/issues/3295)) | changed (bug fix) |
+| 2026-11-06 | fix | In the overview only the focused workspace draws the active focus ring, so the focused window is identifiable | changed (bug fix) |
+| 2026-11-06 | feature | `overview { focus-ring {…} shadow {…} }` — own focus ring and shadow while the overview is open ([docs](docs/wiki/Configuration:-Miscellaneous.md#focus-ring-and-shadow)) | unchanged |
+
+---
+
 <h1 align="center"><img alt="niri" src="https://github.com/user-attachments/assets/07d05cd0-d5dc-4a28-9a35-51bae8f119a0"></h1>
 <p align="center">A scrollable-tiling Wayland compositor.</p>
 <p align="center">
