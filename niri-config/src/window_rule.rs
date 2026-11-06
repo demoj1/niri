@@ -2,8 +2,8 @@ use knuffel::errors::DecodeError;
 use niri_ipc::ColumnDisplay;
 
 use crate::appearance::{
-    BackgroundEffect, BackgroundEffectRule, BlockOutFrom, BorderRule, CornerRadius, ShadowRule,
-    TabIndicatorRule,
+    BackgroundEffect, BackgroundEffectRule, BlockOutFrom, BlurPart, BorderRule, CornerRadius,
+    ShadowRule, TabIndicatorRule,
 };
 use crate::layout::DefaultPresetSize;
 use crate::utils::{MergeWith, RegexEq};
@@ -68,6 +68,8 @@ pub struct WindowRule {
     pub baba_is_float: Option<bool>,
     #[knuffel(child, unwrap(argument))]
     pub block_out_from: Option<BlockOutFrom>,
+    #[knuffel(child)]
+    pub block_out_blur: Option<BlurPart>,
     #[knuffel(child, unwrap(argument))]
     pub variable_refresh_rate: Option<VrrRule>,
     #[knuffel(child, unwrap(argument, str))]

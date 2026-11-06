@@ -213,6 +213,19 @@ pub trait LayoutElement {
     ) {
     }
 
+    /// Renders the blur on top of the element when it is blocked out with `block-out-blur`.
+    #[allow(clippy::too_many_arguments)]
+    fn render_block_out_blur(
+        &self,
+        _ctx: RenderCtx<GlesRenderer>,
+        _geometry: Rectangle<f64, Logical>,
+        _scale: f64,
+        _radius: CornerRadius,
+        _xray_pos: XrayPos,
+        _push: &mut dyn FnMut(BackgroundEffectElement),
+    ) {
+    }
+
     /// Requests the element to change its size.
     ///
     /// The size request is stored and will be continuously sent to the element on any further

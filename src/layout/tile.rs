@@ -1137,6 +1137,16 @@ impl<W: LayoutElement> Tile<W> {
             &mut |elem| push(elem.into()),
         );
 
+        // Pushed before the window so that the framebuffer blur samples the window itself.
+        self.window.render_block_out_blur(
+            ctx.as_gles(),
+            area,
+            self.scale,
+            radius,
+            xray_pos,
+            &mut |elem| push(elem.into()),
+        );
+
         // If we're resizing, try to render a shader, or a fallback.
         let mut pushed_resize = false;
         if let Some(resize) = &self.resize_animation {
