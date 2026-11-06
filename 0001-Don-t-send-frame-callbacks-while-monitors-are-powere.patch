@@ -1,0 +1,48 @@
+From 98278219d42dab8f46562e041ca9d1946132cfa6 Mon Sep 17 00:00:00 2001
+From: Dmitry Dubina <dmitryd.prog@gmail.com>
+Date: Fri, 6 Nov 2026 01:25:50 +0700
+Subject: [PATCH] Don't send frame callbacks while monitors are powered off
+
+With monitors off, redraw() skips rendering but still sent frame
+callbacks with no vblank throttling, so clients (notably X11 ones via
+xwayland-satellite) kept committing buffers that were never presented
+or released, growing VRAM until allocation failed (niri #3295).
+
+Also skip the fallback frame callback timer in that state (same as
+upstream bb38b7e14).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/niri.rs | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/niri.rs b/src/niri.rs
+index ec40e01c..b3abbb7c 100644
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -4686,7 +4686,10 @@ impl Niri {
+         //
+         // However, this should probably be restricted to sending frame callbacks to more surfaces,
+         // to err on the safe side.
+-        self.send_frame_callbacks(output);
++        // Monitors off: no vblank throttles redraws, so callbacks make clients pile up buffers.
++        if self.monitors_active {
++            self.send_frame_callbacks(output);
++        }
+         backend.with_primary_renderer(|renderer| {
+             #[cfg(feature = "xdp-gnome-screencast")]
+             {
+@@ -5103,6 +5106,10 @@ impl Niri {
+     }
+ 
+     pub fn send_frame_callbacks_on_fallback_timer(&mut self) {
++        if !self.monitors_active || self.output_state.is_empty() {
++            return;
++        }
++
+         let _span = tracy_client::span!("Niri::send_frame_callbacks_on_fallback_timer");
+ 
+         // Make up a bogus output; we don't care about it here anyway, just the throttling timer.
+-- 
+2.56.0
+
