@@ -1,0 +1,317 @@
+From 972895301e89d4b6407b3e47998a842b3ba1a610 Mon Sep 17 00:00:00 2001
+From: Dmitry Dubina <dmitryd.prog@gmail.com>
+Date: Fri, 6 Nov 2026 12:15:30 +0700
+Subject: [PATCH] Add block-out-blur window rule
+
+Blocked-out windows can be blurred instead of filled with solid black: the
+window is rendered as usual and a framebuffer blur is drawn on top of it.
+The rule takes the same settings as the global blur section.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ docs/wiki/Configuration:-Window-Rules.md | 29 +++++++++++++
+ niri-config/src/lib.rs                   | 20 +++++++++
+ niri-config/src/window_rule.rs           |  6 ++-
+ src/layout/mod.rs                        | 13 ++++++
+ src/layout/tile.rs                       | 10 +++++
+ src/window/mapped.rs                     | 52 +++++++++++++++++++++++-
+ src/window/mod.rs                        | 10 ++++-
+ 7 files changed, 134 insertions(+), 6 deletions(-)
+
+diff --git a/docs/wiki/Configuration:-Window-Rules.md b/docs/wiki/Configuration:-Window-Rules.md
+index f8fa215e..55fdc10f 100644
+--- a/docs/wiki/Configuration:-Window-Rules.md
++++ b/docs/wiki/Configuration:-Window-Rules.md
+@@ -54,6 +54,10 @@ window-rule {
+     opacity 0.5
+     block-out-from "screencast"
+     // block-out-from "screen-capture"
++    block-out-blur {
++        passes 5
++        offset 10
++    }
+     variable-refresh-rate true
+     default-column-display "tabbed"
+     default-floating-position x=100 y=200 relative-to="bottom-left"
+@@ -594,6 +598,31 @@ window-rule {
+ > This is because window title (and app ID) are not double-buffered in the Wayland protocol, so they are not tied to specific window contents.
+ > There's no robust way for Firefox to synchronize visibly showing a different tab and changing the window title.
+ 
++#### `block-out-blur`
++
++Blur a blocked-out window instead of filling it with solid black.
++The window contents are rendered and then blurred, so the shape of the window remains visible while the contents are not readable.
++Pop-ups of a blocked-out window are still hidden.
++
++Settings mirror the global [`blur`](./Configuration:-Miscellaneous.md#blur) section and are applied on top of it; an empty `block-out-blur {}` uses the global settings as is.
++
++```kdl
++window-rule {
++    match app-id=r#"^org\.telegram\.desktop$"#
++
++    block-out-from "screencast"
++    block-out-blur {
++        passes 5
++        offset 10
++        noise 0.1
++    }
++}
++```
++
++> [!WARNING]
++> A weak blur leaves text readable: `passes 1` with `offset 1` barely hides anything.
++> Keep `passes` and `offset` high, or use the default solid black.
++
+ #### `opacity`
+ 
+ Set the opacity of the window.
+diff --git a/niri-config/src/lib.rs b/niri-config/src/lib.rs
+index c9ba229d..adf12986 100644
+--- a/niri-config/src/lib.rs
++++ b/niri-config/src/lib.rs
+@@ -899,6 +899,10 @@ mod tests {
+                 default-window-height { fixed 500; }
+                 default-column-display "tabbed"
+                 default-floating-position x=100 y=-200 relative-to="bottom-left"
++                block-out-blur {
++                    passes 5
++                    offset 10
++                }
+ 
+                 focus-ring {
+                     off
+@@ -1904,6 +1908,22 @@ mod tests {
+                     clip_to_geometry: None,
+                     baba_is_float: None,
+                     block_out_from: None,
++                    block_out_blur: Some(
++                        BlurPart {
++                            off: false,
++                            on: false,
++                            passes: Some(
++                                5,
++                            ),
++                            offset: Some(
++                                FloatOrInt(
++                                    10.0,
++                                ),
++                            ),
++                            noise: None,
++                            saturation: None,
++                        },
++                    ),
+                     variable_refresh_rate: None,
+                     default_column_display: Some(
+                         Tabbed,
+diff --git a/niri-config/src/window_rule.rs b/niri-config/src/window_rule.rs
+index f2bc2ad1..db940b16 100644
+--- a/niri-config/src/window_rule.rs
++++ b/niri-config/src/window_rule.rs
+@@ -1,8 +1,8 @@
+ use niri_ipc::ColumnDisplay;
+ 
+ use crate::appearance::{
+-    BackgroundEffect, BackgroundEffectRule, BlockOutFrom, BorderRule, CornerRadius, ShadowRule,
+-    TabIndicatorRule,
++    BackgroundEffect, BackgroundEffectRule, BlockOutFrom, BlurPart, BorderRule, CornerRadius,
++    ShadowRule, TabIndicatorRule,
+ };
+ use crate::layout::DefaultPresetSize;
+ use crate::utils::{MergeWith, RegexEq};
+@@ -65,6 +65,8 @@ pub struct WindowRule {
+     pub baba_is_float: Option<bool>,
+     #[knuffel(child, unwrap(argument))]
+     pub block_out_from: Option<BlockOutFrom>,
++    #[knuffel(child)]
++    pub block_out_blur: Option<BlurPart>,
+     #[knuffel(child, unwrap(argument))]
+     pub variable_refresh_rate: Option<bool>,
+     #[knuffel(child, unwrap(argument, str))]
+diff --git a/src/layout/mod.rs b/src/layout/mod.rs
+index 7b245f81..fe7679c1 100644
+--- a/src/layout/mod.rs
++++ b/src/layout/mod.rs
+@@ -213,6 +213,19 @@ pub trait LayoutElement {
+     ) {
+     }
+ 
++    /// Renders the blur on top of the element when it is blocked out with `block-out-blur`.
++    #[allow(clippy::too_many_arguments)]
++    fn render_block_out_blur(
++        &self,
++        _ctx: RenderCtx<GlesRenderer>,
++        _geometry: Rectangle<f64, Logical>,
++        _scale: f64,
++        _radius: CornerRadius,
++        _xray_pos: XrayPos,
++        _push: &mut dyn FnMut(BackgroundEffectElement),
++    ) {
++    }
++
+     /// Requests the element to change its size.
+     ///
+     /// The size request is stored and will be continuously sent to the element on any further
+diff --git a/src/layout/tile.rs b/src/layout/tile.rs
+index be13f5c0..af2a72c4 100644
+--- a/src/layout/tile.rs
++++ b/src/layout/tile.rs
+@@ -1095,6 +1095,16 @@ impl<W: LayoutElement> Tile<W> {
+             &mut |elem| push(elem.into()),
+         );
+ 
++        // Pushed before the window so that the framebuffer blur samples the window itself.
++        self.window.render_block_out_blur(
++            ctx.as_gles(),
++            area,
++            self.scale,
++            radius,
++            xray_pos,
++            &mut |elem| push(elem.into()),
++        );
++
+         // If we're resizing, try to render a shader, or a fallback.
+         let mut pushed_resize = false;
+         if let Some(resize) = &self.resize_animation {
+diff --git a/src/window/mapped.rs b/src/window/mapped.rs
+index 3db1f66c..b5325175 100644
+--- a/src/window/mapped.rs
++++ b/src/window/mapped.rs
+@@ -1,6 +1,7 @@
+ use std::cell::{Cell, Ref, RefCell};
+ use std::time::Duration;
+ 
++use niri_config::utils::MergeWith as _;
+ use niri_config::{Color, Config, CornerRadius, GradientInterpolation, WindowRule};
+ use smithay::backend::renderer::element::surface::WaylandSurfaceRenderElement;
+ use smithay::backend::renderer::element::Kind;
+@@ -28,7 +29,9 @@ use crate::layout::{
+     LayoutElementRenderSnapshot, SizingMode,
+ };
+ use crate::niri_render_elements;
+-use crate::render_helpers::background_effect::BackgroundEffectElement;
++use crate::render_helpers::background_effect::{
++    BackgroundEffect, BackgroundEffectElement, RenderParams,
++};
+ use crate::render_helpers::border::BorderRenderElement;
+ use crate::render_helpers::offscreen::OffscreenData;
+ use crate::render_helpers::renderer::NiriRenderer;
+@@ -106,6 +109,9 @@ pub struct Mapped {
+     /// Buffer to draw instead of the window when it should be blocked out.
+     block_out_buffer: RefCell<SolidColorBuffer>,
+ 
++    /// Blur drawn over the window when it is blocked out with `block-out-blur`.
++    block_out_blur_effect: RefCell<BackgroundEffect>,
++
+     /// The blur config, passed for background effect rendering.
+     blur_config: niri_config::Blur,
+ 
+@@ -292,6 +298,7 @@ impl Mapped {
+             is_window_cast_target: false,
+             ignore_opacity_window_rule: false,
+             block_out_buffer: RefCell::new(SolidColorBuffer::new((0., 0.), [0., 0., 0., 1.])),
++            block_out_blur_effect: RefCell::new(BackgroundEffect::new()),
+             blur_config: config.blur,
+             animate_next_configure: false,
+             animate_serials: Vec::new(),
+@@ -320,6 +327,11 @@ impl Mapped {
+         self.window.toplevel().expect("no X11 support")
+     }
+ 
++    fn block_out_blur_config(&self) -> Option<niri_config::Blur> {
++        let config = self.blur_config.merged_with(&self.rules.block_out_blur?);
++        (!config.off).then_some(config)
++    }
++
+     /// Recomputes the resolved window rules and returns whether they changed.
+     pub fn recompute_window_rules(&mut self, rules: &[WindowRule], is_at_startup: bool) -> bool {
+         self.need_to_recompute_rules = false;
+@@ -651,7 +663,9 @@ impl LayoutElement for Mapped {
+         alpha: f32,
+         push: &mut dyn FnMut(LayoutElementRenderElement<R>),
+     ) {
+-        if ctx.target.should_block_out(self.rules.block_out_from) {
++        if ctx.target.should_block_out(self.rules.block_out_from)
++            && self.block_out_blur_config().is_none()
++        {
+             let mut buffer = self.block_out_buffer.borrow_mut();
+             buffer.resize(self.window.geometry().size.to_f64());
+             let elem =
+@@ -737,6 +751,40 @@ impl LayoutElement for Mapped {
+         }
+     }
+ 
++    fn render_block_out_blur(
++        &self,
++        ctx: RenderCtx<GlesRenderer>,
++        geometry: Rectangle<f64, Logical>,
++        scale: f64,
++        radius: CornerRadius,
++        xray_pos: XrayPos,
++        push: &mut dyn FnMut(BackgroundEffectElement),
++    ) {
++        if !ctx.target.should_block_out(self.rules.block_out_from) {
++            return;
++        }
++        let Some(config) = self.block_out_blur_config() else {
++            return;
++        };
++
++        let mut effect = self.block_out_blur_effect.borrow_mut();
++        effect.update_config(config);
++        let options = niri_config::BackgroundEffect {
++            blur: Some(true),
++            xray: Some(false),
++            ..Default::default()
++        };
++        effect.update_render_elements(radius, options, false);
++
++        let params = RenderParams {
++            geometry,
++            subregion: None,
++            clip: Some((geometry, radius)),
++            scale,
++        };
++        effect.render(ctx, None, params, xray_pos, push);
++    }
++
+     fn render_background_effect(
+         &self,
+         ctx: RenderCtx<GlesRenderer>,
+diff --git a/src/window/mod.rs b/src/window/mod.rs
+index 14527cd2..87e25ce4 100644
+--- a/src/window/mod.rs
++++ b/src/window/mod.rs
+@@ -3,8 +3,8 @@ use std::cmp::{max, min};
+ use niri_config::utils::MergeWith as _;
+ use niri_config::window_rule::{Match, WindowRule};
+ use niri_config::{
+-    BackgroundEffect, BlockOutFrom, BorderRule, CornerRadius, FloatingPosition, PresetSize,
+-    ResolvedPopupsRules, ShadowRule, TabIndicatorRule,
++    BackgroundEffect, BlockOutFrom, BlurPart, BorderRule, CornerRadius, FloatingPosition,
++    PresetSize, ResolvedPopupsRules, ShadowRule, TabIndicatorRule,
+ };
+ use niri_ipc::ColumnDisplay;
+ use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
+@@ -111,6 +111,9 @@ pub struct ResolvedWindowRules {
+     /// Whether to block out this window from certain render targets.
+     pub block_out_from: Option<BlockOutFrom>,
+ 
++    /// Blur blocked-out windows with these settings instead of filling them with black.
++    pub block_out_blur: Option<BlurPart>,
++
+     /// Whether to enable VRR on this window's primary output if it is on-demand.
+     pub variable_refresh_rate: Option<bool>,
+ 
+@@ -293,6 +296,9 @@ impl ResolvedWindowRules {
+                 if let Some(x) = rule.block_out_from {
+                     resolved.block_out_from = Some(x);
+                 }
++                if let Some(x) = rule.block_out_blur {
++                    resolved.block_out_blur = Some(x);
++                }
+                 if let Some(x) = rule.variable_refresh_rate {
+                     resolved.variable_refresh_rate = Some(x);
+                 }
+-- 
+2.56.0
+

@@ -5,6 +5,7 @@
 | `0001` monitors-off frame callbacks | Fixes [niri-wm/niri#3295](https://github.com/niri-wm/niri/issues/3295): VRAM leak while monitors are powered off that kills X11 windows (Emacs, etc.) |
 | `0002` one active ring in overview | In the overview only the focused workspace draws the active focus ring, so you can see which window is focused |
 | `0003` overview focus-ring/shadow | New `focus-ring {}` and `shadow {}` inside `overview {}` to style windows differently in the overview |
+| `0004` block-out-blur | Window rule `block-out-blur { passes … offset … }`: blocked-out windows are blurred in screencasts/screenshots instead of solid black |
 
 The same changes live on the fork's [`main`](https://github.com/demoj1/niri) (upstream `main` + fork commits on top, changelog in its README). Here they are backported to the v26.04 release.
 
