@@ -11,6 +11,7 @@
 | 2026-11-06 | fix | Don't send frame callbacks while monitors are powered off — fixes the VRAM leak that kills X11 windows ([#3295](https://github.com/niri-wm/niri/issues/3295)) | changed (bug fix) |
 | 2026-11-06 | fix | In the overview only the focused workspace draws the active focus ring, so the focused window is identifiable | changed (bug fix) |
 | 2026-11-06 | feature | `overview { focus-ring {…} shadow {…} }` — own focus ring and shadow while the overview is open ([docs](docs/wiki/Configuration:-Miscellaneous.md#focus-ring-and-shadow)) | unchanged |
+| 2026-11-06 | feature | Window rule `block-out-blur { passes … offset … }` — blur blocked-out windows in screencasts/screenshots instead of solid black ([docs](docs/wiki/Configuration:-Window-Rules.md#block-out-blur)) | unchanged |
 
 ---
 

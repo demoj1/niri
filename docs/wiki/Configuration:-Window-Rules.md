@@ -55,6 +55,10 @@ window-rule {
     block-out-from "screencast"
     // block-out-from "screen-capture"
     // block-out-from "screen-capture" kind="hide"
+    block-out-blur {
+        passes 5
+        offset 10
+    }
     variable-refresh-rate true
     default-column-display "tabbed"
     default-floating-position x=100 y=200 relative-to="bottom-left"
@@ -629,6 +633,31 @@ window-rule {
     block-out-from "screen-capture" kind="hide"
 }
 ```
+
+#### `block-out-blur`
+
+Blur a blocked-out window instead of filling it with solid black.
+The window contents are rendered and then blurred, so the shape of the window remains visible while the contents are not readable.
+Pop-ups of a blocked-out window are still hidden.
+
+Settings mirror the global [`blur`](./Configuration:-Miscellaneous.md#blur) section and are applied on top of it; an empty `block-out-blur {}` uses the global settings as is.
+
+```kdl
+window-rule {
+    match app-id=r#"^org\.telegram\.desktop$"#
+
+    block-out-from "screencast"
+    block-out-blur {
+        passes 5
+        offset 10
+        noise 0.1
+    }
+}
+```
+
+> [!WARNING]
+> A weak blur leaves text readable: `passes 1` with `offset 1` barely hides anything.
+> Keep `passes` and `offset` high, or use the default solid black.
 
 #### `on-xdg-activate`
 

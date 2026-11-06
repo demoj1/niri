@@ -3,8 +3,8 @@ use std::cmp::{max, min};
 use niri_config::utils::MergeWith as _;
 use niri_config::window_rule::{Match, OnXdgActivate, VrrRule, WindowRule};
 use niri_config::{
-    BackgroundEffect, BlockOutFrom, BorderRule, CornerRadius, FloatingPosition, PresetSize,
-    ResolvedPopupsRules, ShadowRule, TabIndicatorRule,
+    BackgroundEffect, BlockOutFrom, BlurPart, BorderRule, CornerRadius, FloatingPosition,
+    PresetSize, ResolvedPopupsRules, ShadowRule, TabIndicatorRule,
 };
 use niri_ipc::ColumnDisplay;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
@@ -113,6 +113,9 @@ pub struct ResolvedWindowRules {
 
     /// Whether to block out this window from certain render targets.
     pub block_out_from: Option<BlockOutFrom>,
+
+    /// Blur blocked-out windows with these settings instead of filling them with black.
+    pub block_out_blur: Option<BlurPart>,
 
     /// Whether to enable VRR on this window's primary output if it is on-demand.
     pub variable_refresh_rate: Option<VrrRule>,
@@ -302,6 +305,9 @@ impl ResolvedWindowRules {
                 }
                 if let Some(x) = rule.block_out_from {
                     resolved.block_out_from = Some(x);
+                }
+                if let Some(x) = rule.block_out_blur {
+                    resolved.block_out_blur = Some(x);
                 }
                 if let Some(x) = rule.variable_refresh_rate {
                     resolved.variable_refresh_rate = Some(x);
