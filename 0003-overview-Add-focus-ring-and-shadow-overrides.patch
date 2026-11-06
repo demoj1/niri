@@ -1,0 +1,427 @@
+From 589fe8d403e996b55b1e111aecbe7a73dbff07a0 Mon Sep 17 00:00:00 2001
+From: Dmitry Dubina <dmitryd.prog@gmail.com>
+Date: Fri, 6 Nov 2026 11:08:22 +0700
+Subject: [PATCH 3/3] overview: Add focus-ring and shadow overrides
+
+Lets the overview use its own focus ring and window shadow, e.g. a thicker
+ring so the focused window is visible at zoomed-out scale. Overrides apply
+on top of the layout settings, and window rules still apply on top.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ docs/wiki/Configuration:-Miscellaneous.md | 21 +++++++++
+ niri-config/src/lib.rs                    | 49 +++++++++++++++++++
+ niri-config/src/misc.rs                   | 14 +++++-
+ src/layout/floating.rs                    |  9 +++-
+ src/layout/mod.rs                         |  9 +++-
+ src/layout/monitor.rs                     |  3 +-
+ src/layout/scrolling.rs                   | 13 ++++--
+ src/layout/tile.rs                        | 57 ++++++++++++++---------
+ src/layout/workspace.rs                   | 13 ++++--
+ 9 files changed, 151 insertions(+), 37 deletions(-)
+
+diff --git a/docs/wiki/Configuration:-Miscellaneous.md b/docs/wiki/Configuration:-Miscellaneous.md
+index 7a2f42dd..84c11240 100644
+--- a/docs/wiki/Configuration:-Miscellaneous.md
++++ b/docs/wiki/Configuration:-Miscellaneous.md
+@@ -248,6 +248,27 @@ overview {
+ }
+ ```
+ 
++#### `focus-ring` and `shadow`
++
++Override the window focus ring and shadow while the overview is open.
++
++Settings here mirror the [`focus-ring` and `shadow` window rules](./Configuration:-Window-Rules.md#focus-ring-and-border): they are applied on top of the layout settings, and window rules still apply on top of them.
++Sizes are zoomed out together with the workspace, so with `zoom 0.5` a `width 8` focus ring is 4 pixels wide on screen.
++
++```kdl
++// Thick green focus ring and red shadows in the overview.
++overview {
++    focus-ring {
++        width 8
++        active-color "#00ff00"
++    }
++
++    shadow {
++        color "#ff000080"
++    }
++}
++```
++
+ ### `xwayland-satellite`
+ 
+ <sup>Since: 25.08</sup>
+diff --git a/niri-config/src/lib.rs b/niri-config/src/lib.rs
+index 329b7669..c9ba229d 100644
+--- a/niri-config/src/lib.rs
++++ b/niri-config/src/lib.rs
+@@ -871,6 +871,16 @@ mod tests {
+                 }
+             }
+ 
++            overview {
++                focus-ring {
++                    width 8
++                    active-color "#00ff00"
++                }
++                shadow {
++                    color "#ff000080"
++                }
++            }
++
+             environment {
+                 QT_QPA_PLATFORM "wayland"
+                 DISPLAY null
+@@ -1689,6 +1699,45 @@ mod tests {
+                         a: 0.3137255,
+                     },
+                 },
++                focus_ring: BorderRule {
++                    off: false,
++                    on: false,
++                    width: Some(
++                        FloatOrInt(
++                            8.0,
++                        ),
++                    ),
++                    active_color: Some(
++                        Color {
++                            r: 0.0,
++                            g: 1.0,
++                            b: 0.0,
++                            a: 1.0,
++                        },
++                    ),
++                    inactive_color: None,
++                    urgent_color: None,
++                    active_gradient: None,
++                    inactive_gradient: None,
++                    urgent_gradient: None,
++                },
++                shadow: ShadowRule {
++                    off: false,
++                    on: false,
++                    offset: None,
++                    softness: None,
++                    spread: None,
++                    draw_behind_window: None,
++                    color: Some(
++                        Color {
++                            r: 1.0,
++                            g: 0.0,
++                            b: 0.0,
++                            a: 0.5019608,
++                        },
++                    ),
++                    inactive_color: None,
++                },
+             },
+             environment: Environment(
+                 [
+diff --git a/niri-config/src/misc.rs b/niri-config/src/misc.rs
+index 66a200ca..04f0e15e 100644
+--- a/niri-config/src/misc.rs
++++ b/niri-config/src/misc.rs
+@@ -1,4 +1,6 @@
+-use crate::appearance::{Color, WorkspaceShadow, WorkspaceShadowPart, DEFAULT_BACKDROP_COLOR};
++use crate::appearance::{
++    BorderRule, Color, ShadowRule, WorkspaceShadow, WorkspaceShadowPart, DEFAULT_BACKDROP_COLOR,
++};
+ use crate::utils::{Flag, MergeWith};
+ use crate::FloatOrInt;
+ 
+@@ -123,6 +125,8 @@ pub struct Overview {
+     pub zoom: f64,
+     pub backdrop_color: Color,
+     pub workspace_shadow: WorkspaceShadow,
++    pub focus_ring: BorderRule,
++    pub shadow: ShadowRule,
+ }
+ 
+ impl Default for Overview {
+@@ -131,6 +135,8 @@ impl Default for Overview {
+             zoom: 0.5,
+             backdrop_color: DEFAULT_BACKDROP_COLOR,
+             workspace_shadow: WorkspaceShadow::default(),
++            focus_ring: BorderRule::default(),
++            shadow: ShadowRule::default(),
+         }
+     }
+ }
+@@ -143,11 +149,15 @@ pub struct OverviewPart {
+     pub backdrop_color: Option<Color>,
+     #[knuffel(child)]
+     pub workspace_shadow: Option<WorkspaceShadowPart>,
++    #[knuffel(child)]
++    pub focus_ring: Option<BorderRule>,
++    #[knuffel(child)]
++    pub shadow: Option<ShadowRule>,
+ }
+ 
+ impl MergeWith<OverviewPart> for Overview {
+     fn merge_with(&mut self, part: &OverviewPart) {
+-        merge!((self, part), zoom, workspace_shadow);
++        merge!((self, part), zoom, workspace_shadow, focus_ring, shadow);
+         merge_clone!((self, part), backdrop_color);
+     }
+ }
+diff --git a/src/layout/floating.rs b/src/layout/floating.rs
+index d102f40d..e2f22da9 100644
+--- a/src/layout/floating.rs
++++ b/src/layout/floating.rs
+@@ -265,7 +265,12 @@ impl<W: LayoutElement> FloatingSpace<W> {
+         self.tiles.iter().any(Tile::are_transitions_ongoing) || !self.closing_windows.is_empty()
+     }
+ 
+-    pub fn update_render_elements(&mut self, is_active: bool, view_rect: Rectangle<f64, Logical>) {
++    pub fn update_render_elements(
++        &mut self,
++        is_active: bool,
++        in_overview: bool,
++        view_rect: Rectangle<f64, Logical>,
++    ) {
+         let active = self.active_window_id.clone();
+         for (tile, offset) in self.tiles_with_offsets_mut() {
+             let id = tile.window().id();
+@@ -273,7 +278,7 @@ impl<W: LayoutElement> FloatingSpace<W> {
+ 
+             let mut tile_view_rect = view_rect;
+             tile_view_rect.loc -= offset + tile.render_offset();
+-            tile.update_render_elements(is_active, tile_view_rect);
++            tile.update_render_elements(is_active, in_overview, tile_view_rect);
+         }
+     }
+ 
+diff --git a/src/layout/mod.rs b/src/layout/mod.rs
+index 5c4dd639..7b245f81 100644
+--- a/src/layout/mod.rs
++++ b/src/layout/mod.rs
+@@ -2787,7 +2787,9 @@ impl<W: LayoutElement> Layout<W> {
+                     Rectangle::new(pos_within_output.upscale(-1.), output_size(&move_.output))
+                         .downscale(zoom);
+ 
+-                move_.tile.update_render_elements(true, view_rect);
++                move_
++                    .tile
++                    .update_render_elements(true, self.overview_open, view_rect);
+             }
+         }
+ 
+@@ -4669,7 +4671,10 @@ impl<W: LayoutElement> Layout<W> {
+                 let view_rect =
+                     Rectangle::new(pos_within_output.upscale(-1.), output_size(&move_.output))
+                         .downscale(zoom);
+-                move_.tile.update_render_elements(false, view_rect);
++                let in_overview = move_.tile.in_overview();
++                move_
++                    .tile
++                    .update_render_elements(false, in_overview, view_rect);
+ 
+                 move_.tile.store_unmap_snapshot_if_empty(
+                     renderer,
+diff --git a/src/layout/monitor.rs b/src/layout/monitor.rs
+index 99cac704..7e20cb42 100644
+--- a/src/layout/monitor.rs
++++ b/src/layout/monitor.rs
+@@ -1096,10 +1096,11 @@ impl<W: LayoutElement> Monitor<W> {
+             .as_ref()
+             .and_then(|hint| hint.workspace.existing_id());
+         let active_ws_id = self.active_workspace_ref().id();
++        let in_overview = self.overview_open;
+ 
+         for (ws, geo) in self.workspaces_with_render_geo_mut(true) {
+             // The overview shows all workspaces, so only the focused one is active.
+-            ws.update_render_elements(is_active && ws.id() == active_ws_id);
++            ws.update_render_elements(is_active && ws.id() == active_ws_id, in_overview);
+ 
+             if Some(ws.id()) == insert_hint_ws_id {
+                 insert_hint_ws_geo = Some(geo);
+diff --git a/src/layout/scrolling.rs b/src/layout/scrolling.rs
+index 007bcaf5..a4d2443f 100644
+--- a/src/layout/scrolling.rs
++++ b/src/layout/scrolling.rs
+@@ -396,7 +396,7 @@ impl<W: LayoutElement> ScrollingSpace<W> {
+             || !self.closing_windows.is_empty()
+     }
+ 
+-    pub fn update_render_elements(&mut self, is_active: bool) {
++    pub fn update_render_elements(&mut self, is_active: bool, in_overview: bool) {
+         let view_pos = Point::from((self.view_pos(), 0.));
+         let view_size = self.view_size;
+         let active_idx = self.active_column_idx;
+@@ -405,7 +405,7 @@ impl<W: LayoutElement> ScrollingSpace<W> {
+             let col_off = Point::from((col_x, 0.));
+             let col_pos = view_pos - col_off - col.render_offset();
+             let view_rect = Rectangle::new(col_pos, view_size);
+-            col.update_render_elements(is_active, view_rect);
++            col.update_render_elements(is_active, in_overview, view_rect);
+         }
+     }
+ 
+@@ -4097,14 +4097,19 @@ impl<W: LayoutElement> Column<W> {
+             || self.tiles.iter().any(Tile::are_transitions_ongoing)
+     }
+ 
+-    pub fn update_render_elements(&mut self, is_active: bool, view_rect: Rectangle<f64, Logical>) {
++    pub fn update_render_elements(
++        &mut self,
++        is_active: bool,
++        in_overview: bool,
++        view_rect: Rectangle<f64, Logical>,
++    ) {
+         let active_idx = self.active_tile_idx;
+         for (tile_idx, (tile, tile_off)) in self.tiles_mut().enumerate() {
+             let is_active = is_active && tile_idx == active_idx;
+ 
+             let mut tile_view_rect = view_rect;
+             tile_view_rect.loc -= tile_off + tile.render_offset();
+-            tile.update_render_elements(is_active, tile_view_rect);
++            tile.update_render_elements(is_active, in_overview, tile_view_rect);
+         }
+ 
+         let config = self.tab_indicator.config();
+diff --git a/src/layout/tile.rs b/src/layout/tile.rs
+index 86c7ebad..be13f5c0 100644
+--- a/src/layout/tile.rs
++++ b/src/layout/tile.rs
+@@ -50,6 +50,9 @@ pub struct Tile<W: LayoutElement> {
+     /// The shadow around the window.
+     shadow: Shadow,
+ 
++    /// Whether the focus ring and shadow currently use the overview overrides.
++    in_overview: bool,
++
+     /// This tile's current sizing mode.
+     ///
+     /// This will update only when the `window` actually goes maximized or fullscreen, rather than
+@@ -193,6 +196,7 @@ impl<W: LayoutElement> Tile<W> {
+             border: FocusRing::new(border_config.into()),
+             focus_ring: FocusRing::new(focus_ring_config),
+             shadow: Shadow::new(shadow_config),
++            in_overview: false,
+             sizing_mode,
+             fullscreen_backdrop: SolidColorBuffer::new((0., 0.), [0., 0., 0., 1.]),
+             restore_to_floating: false,
+@@ -241,20 +245,26 @@ impl<W: LayoutElement> Tile<W> {
+         border_config.width = round_max1(border_config.width);
+         self.border.update_config(border_config.into());
+ 
+-        let mut focus_ring_config = self
+-            .options
+-            .layout
+-            .focus_ring
+-            .merged_with(&rules.focus_ring);
+-        focus_ring_config.width = round_max1(focus_ring_config.width);
+-        self.focus_ring.update_config(focus_ring_config);
+-
+-        let shadow_config = self.options.layout.shadow.merged_with(&rules.shadow);
+-        self.shadow.update_config(shadow_config);
++        self.update_focus_ring_and_shadow_config();
+ 
+         self.window.update_config(self.options.blur);
+     }
+ 
++    fn update_focus_ring_and_shadow_config(&mut self) {
++        let rules = self.window.rules();
++        let mut focus_ring = self.options.layout.focus_ring;
++        let mut shadow = self.options.layout.shadow;
++        if self.in_overview {
++            focus_ring.merge_with(&self.options.overview.focus_ring);
++            shadow.merge_with(&self.options.overview.shadow);
++        }
++        focus_ring.merge_with(&rules.focus_ring);
++        shadow.merge_with(&rules.shadow);
++        focus_ring.width = round_logical_in_physical_max1(self.scale, focus_ring.width);
++        self.focus_ring.update_config(focus_ring);
++        self.shadow.update_config(shadow);
++    }
++
+     pub fn update_shaders(&mut self) {
+         self.border.update_shaders();
+         self.focus_ring.update_shaders();
+@@ -391,16 +401,7 @@ impl<W: LayoutElement> Tile<W> {
+         border_config.width = round_max1(border_config.width);
+         self.border.update_config(border_config.into());
+ 
+-        let mut focus_ring_config = self
+-            .options
+-            .layout
+-            .focus_ring
+-            .merged_with(&rules.focus_ring);
+-        focus_ring_config.width = round_max1(focus_ring_config.width);
+-        self.focus_ring.update_config(focus_ring_config);
+-
+-        let shadow_config = self.options.layout.shadow.merged_with(&rules.shadow);
+-        self.shadow.update_config(shadow_config);
++        self.update_focus_ring_and_shadow_config();
+ 
+         let window_size = self.window_size();
+         let radius = self
+@@ -456,7 +457,17 @@ impl<W: LayoutElement> Tile<W> {
+                 .is_some_and(|alpha| !alpha.anim.is_done())
+     }
+ 
+-    pub fn update_render_elements(&mut self, is_active: bool, view_rect: Rectangle<f64, Logical>) {
++    pub fn update_render_elements(
++        &mut self,
++        is_active: bool,
++        in_overview: bool,
++        view_rect: Rectangle<f64, Logical>,
++    ) {
++        if self.in_overview != in_overview {
++            self.in_overview = in_overview;
++            self.update_focus_ring_and_shadow_config();
++        }
++
+         let rules = self.window.rules();
+         let animated_tile_size = self.animated_tile_size();
+         let expanded_progress = self.expanded_progress();
+@@ -1530,6 +1541,10 @@ impl<W: LayoutElement> Tile<W> {
+         &self.border
+     }
+ 
++    pub fn in_overview(&self) -> bool {
++        self.in_overview
++    }
++
+     pub fn focus_ring(&self) -> &FocusRing {
+         &self.focus_ring
+     }
+diff --git a/src/layout/workspace.rs b/src/layout/workspace.rs
+index 49548a83..11fdf331 100644
+--- a/src/layout/workspace.rs
++++ b/src/layout/workspace.rs
+@@ -375,13 +375,16 @@ impl<W: LayoutElement> Workspace<W> {
+         self.scrolling.are_transitions_ongoing() || self.floating.are_transitions_ongoing()
+     }
+ 
+-    pub fn update_render_elements(&mut self, is_active: bool) {
++    pub fn update_render_elements(&mut self, is_active: bool, in_overview: bool) {
+         self.scrolling
+-            .update_render_elements(is_active && !self.floating_is_active.get());
++            .update_render_elements(is_active && !self.floating_is_active.get(), in_overview);
+ 
+         let view_rect = Rectangle::from_size(self.view_size);
+-        self.floating
+-            .update_render_elements(is_active && self.floating_is_active.get(), view_rect);
++        self.floating.update_render_elements(
++            is_active && self.floating_is_active.get(),
++            in_overview,
++            view_rect,
++        );
+ 
+         self.shadow.update_render_elements(
+             self.view_size,
+@@ -1700,7 +1703,7 @@ impl<W: LayoutElement> Workspace<W> {
+             if tile.window().id() == window {
+                 let view_pos = Point::from((-tile_pos.x, -tile_pos.y));
+                 let view_rect = Rectangle::new(view_pos, view_size);
+-                tile.update_render_elements(false, view_rect);
++                tile.update_render_elements(false, tile.in_overview(), view_rect);
+                 let xray_pos = xray_pos.offset(tile_pos);
+                 tile.store_unmap_snapshot_if_empty(
+                     renderer,
+-- 
+2.56.0
+

@@ -1,0 +1,35 @@
+From 849bc5affca6754c9ff74490a7f3aac41b47b634 Mon Sep 17 00:00:00 2001
+From: Dmitry Dubina <dmitryd.prog@gmail.com>
+Date: Fri, 6 Nov 2026 11:08:13 +0700
+Subject: [PATCH 2/3] layout: Draw active decorations only on the focused
+ workspace
+
+In the overview every workspace is visible, and each one used to draw its
+active window with the active focus ring, so it was unclear which window
+was actually focused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/layout/monitor.rs | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/layout/monitor.rs b/src/layout/monitor.rs
+index 53c06069..99cac704 100644
+--- a/src/layout/monitor.rs
++++ b/src/layout/monitor.rs
+@@ -1095,9 +1095,11 @@ impl<W: LayoutElement> Monitor<W> {
+             .insert_hint
+             .as_ref()
+             .and_then(|hint| hint.workspace.existing_id());
++        let active_ws_id = self.active_workspace_ref().id();
+ 
+         for (ws, geo) in self.workspaces_with_render_geo_mut(true) {
+-            ws.update_render_elements(is_active);
++            // The overview shows all workspaces, so only the focused one is active.
++            ws.update_render_elements(is_active && ws.id() == active_ws_id);
+ 
+             if Some(ws.id()) == insert_hint_ws_id {
+                 insert_hint_ws_geo = Some(geo);
+-- 
+2.56.0
+
