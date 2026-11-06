@@ -378,13 +378,22 @@ impl<W: LayoutElement> Workspace<W> {
         self.scrolling.are_transitions_ongoing() || self.floating.are_transitions_ongoing()
     }
 
-    pub fn update_render_elements(&mut self, is_active: bool, layer: RenderLayer) {
-        self.scrolling
-            .update_render_elements(is_active && !self.floating_is_active.get(), layer);
+    pub fn update_render_elements(
+        &mut self,
+        is_active: bool,
+        in_overview: bool,
+        layer: RenderLayer,
+    ) {
+        self.scrolling.update_render_elements(
+            is_active && !self.floating_is_active.get(),
+            in_overview,
+            layer,
+        );
 
         let view_rect = Rectangle::from_size(self.view_size);
         self.floating.update_render_elements(
             is_active && self.floating_is_active.get(),
+            in_overview,
             view_rect,
             layer,
         );
@@ -1740,7 +1749,7 @@ impl<W: LayoutElement> Workspace<W> {
             if tile.window().id() == window {
                 let view_pos = Point::from((-tile_pos.x, -tile_pos.y));
                 let view_rect = Rectangle::new(view_pos, view_size);
-                tile.update_render_elements(false, view_rect);
+                tile.update_render_elements(false, tile.in_overview(), view_rect);
                 let xray_pos = xray_pos.offset(tile_pos);
                 tile.store_unmap_snapshot_if_empty(
                     renderer,

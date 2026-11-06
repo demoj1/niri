@@ -1364,6 +1364,16 @@ mod tests {
                 }
             }
 
+            overview {
+                focus-ring {
+                    width 8
+                    active-color "#00ff00"
+                }
+                shadow {
+                    color "#ff000080"
+                }
+            }
+
             environment {
                 QT_QPA_PLATFORM "wayland"
                 DISPLAY null
@@ -2211,6 +2221,45 @@ mod tests {
                         b: 0.0,
                         a: 0.3137255,
                     },
+                },
+                focus_ring: BorderRule {
+                    off: false,
+                    on: false,
+                    width: Some(
+                        FloatOrInt(
+                            8.0,
+                        ),
+                    ),
+                    active_color: Some(
+                        Color {
+                            r: 0.0,
+                            g: 1.0,
+                            b: 0.0,
+                            a: 1.0,
+                        },
+                    ),
+                    inactive_color: None,
+                    urgent_color: None,
+                    active_gradient: None,
+                    inactive_gradient: None,
+                    urgent_gradient: None,
+                },
+                shadow: ShadowRule {
+                    off: false,
+                    on: false,
+                    offset: None,
+                    softness: None,
+                    spread: None,
+                    draw_behind_window: None,
+                    color: Some(
+                        Color {
+                            r: 1.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 0.5019608,
+                        },
+                    ),
+                    inactive_color: None,
                 },
             },
             environment: Environment(

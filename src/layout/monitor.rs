@@ -1092,16 +1092,17 @@ impl<W: LayoutElement> Monitor<W> {
             .as_ref()
             .and_then(|hint| hint.workspace.existing_id());
         let active_ws_id = self.active_workspace_ref().id();
+        let in_overview = self.overview_open;
 
         for ws in &mut self.workspaces {
             let is_active = is_active && ws.id() == active_ws_id;
-            ws.update_render_elements(is_active, RenderLayer::MovingBetweenWorkspaces);
+            ws.update_render_elements(is_active, in_overview, RenderLayer::MovingBetweenWorkspaces);
         }
 
         for (ws, geo) in self.workspaces_with_render_geo_mut(true) {
             // The overview shows all workspaces, so only the focused one is active.
             let is_active = is_active && ws.id() == active_ws_id;
-            ws.update_render_elements(is_active, RenderLayer::Normal);
+            ws.update_render_elements(is_active, in_overview, RenderLayer::Normal);
 
             if Some(ws.id()) == insert_hint_ws_id {
                 insert_hint_ws_geo = Some(geo);
