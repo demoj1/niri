@@ -269,6 +269,7 @@ impl<W: LayoutElement> FloatingSpace<W> {
     pub fn update_render_elements(
         &mut self,
         is_active: bool,
+        in_overview: bool,
         view_rect: Rectangle<f64, Logical>,
         layer: RenderLayer,
     ) {
@@ -284,7 +285,7 @@ impl<W: LayoutElement> FloatingSpace<W> {
 
             let mut tile_view_rect = view_rect;
             tile_view_rect.loc -= offset + tile.render_offset();
-            tile.update_render_elements(is_active, tile_view_rect);
+            tile.update_render_elements(is_active, in_overview, tile_view_rect);
         }
     }
 

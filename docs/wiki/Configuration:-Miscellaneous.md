@@ -248,6 +248,27 @@ overview {
 }
 ```
 
+#### `focus-ring` and `shadow`
+
+Override the window focus ring and shadow while the overview is open.
+
+Settings here mirror the [`focus-ring` and `shadow` window rules](./Configuration:-Window-Rules.md#focus-ring-and-border): they are applied on top of the layout settings, and window rules still apply on top of them.
+Sizes are zoomed out together with the workspace, so with `zoom 0.5` a `width 8` focus ring is 4 pixels wide on screen.
+
+```kdl
+// Thick green focus ring and red shadows in the overview.
+overview {
+    focus-ring {
+        width 8
+        active-color "#00ff00"
+    }
+
+    shadow {
+        color "#ff000080"
+    }
+}
+```
+
 ### `xwayland-satellite`
 
 <sup>Since: 25.08</sup>
