@@ -6,7 +6,7 @@
 | `0002` one active ring in overview | In the overview only the focused workspace draws the active focus ring, so you can see which window is focused |
 | `0003` overview focus-ring/shadow | New `focus-ring {}` and `shadow {}` inside `overview {}` to style windows differently in the overview |
 
-Code lives on branch [`dmr/overview-decorations`](https://github.com/demoj1/niri/tree/dmr/overview-decorations) (one commit per patch, on top of v26.04).
+The same changes live on the fork's [`main`](https://github.com/demoj1/niri) (upstream `main` + fork commits on top, changelog in its README). Here they are backported to the v26.04 release.
 
 ## 0001: VRAM leak with monitors off
 
