@@ -14,10 +14,11 @@
 ## Что поддерживается в форке поверх апстрима
 
 Актуальный лог отличий ведется наверху `README.md`:
-1. **`Don't send frame callbacks while monitors are powered off`** — не слать `send_frame_callbacks` при выключенных мониторах, чтобы X11-клиенты через `xwayland-satellite` не забили VRAM до NVKMS-ошибки и смерти окон (апстрим #3295). Не закрывает физическое отключение монитора кнопкой (путь DP HPD-reconnect #4461 / texture cache #4550).
-2. **`layout: Draw active decorations only on the focused workspace`** — в overview активный focus-ring рисуется только на фокусном воркспейсе.
-3. **`overview: Add focus-ring and shadow overrides`** — секция `overview { focus-ring {…} shadow {…} }` поверх `layout`.
-4. **`Add block-out-blur window rule`** — правило `block-out-blur { passes … offset … }` (размытие заблокированных окон в скринкастах/скриншотах вместо черного прямоугольника).
+1. **`layout: Draw active decorations only on the focused workspace`** — в overview активный focus-ring рисуется только на фокусном воркспейсе.
+2. **`overview: Add focus-ring and shadow overrides`** — секция `overview { focus-ring {…} shadow {…} }` поверх `layout`.
+3. **`Add block-out-blur window rule`** — правило `block-out-blur { passes … offset … }` (размытие заблокированных окон в скринкастах/скриншотах вместо черного прямоугольника).
+
+*(Фикс #3295 `Don't send frame callbacks while monitors are powered off` уже попал в апстрим в коммите `78b7adfe` и снят с `main`, но по-прежнему бэкпортирован в `niri-bp`/`niri-arch` для `v26.04` до следующего релиза; путь физического выключения кнопкой #4461/#4550 остаётся открытым.)*
 
 Новые фичи делаем строго опциональными (без новых опций в конфиге поведение совпадает с апстримом). На каждый новый или убранный патч обновляем таблицу `Fork changelog` в `README.md`.
 
